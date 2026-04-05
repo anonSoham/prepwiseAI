@@ -509,8 +509,10 @@ app.get('/students/:username/resume', async (req, res) => {
     }
 });
 
-// PDF resume upload
-const uploadsDir = path.join(__dirname, 'uploads', 'resumes');
+// PDF resume upload — use /tmp on serverless (Vercel), local uploads/ otherwise
+const uploadsDir = process.env.VERCEL
+    ? path.join('/tmp', 'resumes')
+    : path.join(__dirname, 'uploads', 'resumes');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const resumeStorage = multer.diskStorage({
@@ -617,7 +619,11 @@ app.post('/company/announcements', async (req, res) => {
     }
 });
 
-function startServer() {
+// Export app for Vercel serverless
+module.exports = app;
+
+// Start server locally
+if (require.main === module) {
     const server = app.listen(port, () => {
         console.log(`Server running on http://localhost:${port}`);
     });
@@ -629,12 +635,10 @@ function startServer() {
             exec(
                 `for /f "tokens=5" %a in ('netstat -aon ^| findstr ":${port}" ^| findstr "LISTENING"') do taskkill /F /PID %a`,
                 { shell: 'cmd.exe' },
-                () => setTimeout(startServer, 500)
+                () => setTimeout(() => server.listen(port), 500)
             );
         } else {
             throw err;
         }
     });
 }
-
-startServer();
