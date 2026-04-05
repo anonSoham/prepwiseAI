@@ -2,6 +2,8 @@
 
 AI-powered placement preparation platform with mock interviews, aptitude tests, DSA practice, resume builder & ATS scanner.
 
+**Live:** https://prepwise-ai-livid.vercel.app
+
 ---
 
 ## Screenshots
