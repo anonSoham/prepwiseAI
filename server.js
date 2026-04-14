@@ -11,7 +11,7 @@ require('dotenv').config();
 
 const app = express();
 const port = 3000;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim() || '256360738968-megf44e1p645q9i970mohprnq2bvr8qc.apps.googleusercontent.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Allow Google Sign-In popup to communicate with the page
@@ -170,7 +170,7 @@ app.post('/auth/google', async (req, res) => {
             user: { name, email, googleId, picture }
         });
     } catch (error) {
-        console.error('Google auth error:', error.message);
+        console.error('Google auth error:', error.message, '| clientId used:', GOOGLE_CLIENT_ID);
         res.status(401).json({ message: 'Google sign-in failed. Please try again.', error: error.message });
     }
 });
