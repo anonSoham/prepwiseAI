@@ -27,10 +27,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(cors());
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch((err) => console.log('MongoDB connection error:', err));
+// MongoDB connection — cached for serverless (Vercel functions go idle between requests)
+let isConnected = false;
+async function connectDB() {
+    if (isConnected && mongoose.connection.readyState === 1) return;
+    await mongoose.connect(process.env.MONGO_URI, { bufferCommands: false });
+    isConnected = true;
+}
+
+// Reconnect before every request
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        console.error('MongoDB connection error:', err.message);
+        res.status(503).json({ message: 'Database unavailable. Please try again.' });
+    }
+});
 
 // Define the Student schema
 const studentSchema = new mongoose.Schema({
