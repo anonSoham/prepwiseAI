@@ -14,6 +14,12 @@ const port = 3000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+// Allow Google Sign-In popup to communicate with the page
+app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    next();
+});
+
 // Serve frontend files from public/
 app.use(express.static(path.join(__dirname, 'public')));
 
