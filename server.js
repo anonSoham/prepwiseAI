@@ -170,7 +170,7 @@ app.post('/auth/google', async (req, res) => {
             user: { name, email, googleId, picture }
         });
     } catch (error) {
-        console.error('Google auth error:', error.message, '| clientId used:', GOOGLE_CLIENT_ID);
+        console.error('Google auth error:', error.message);
         res.status(401).json({ message: 'Google sign-in failed. Please try again.', error: error.message });
     }
 });
