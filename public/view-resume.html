@@ -282,7 +282,7 @@
     }
 
     try {
-      const res = await fetch('http://localhost:3000/students/' + encodeURIComponent(username) + '/resume');
+      const res = await fetch('/students/' + encodeURIComponent(username) + '/resume');
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
 

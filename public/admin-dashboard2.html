@@ -165,7 +165,7 @@
     <script>
         async function fetchAnnouncements() {
             try {
-                const response = await fetch('http://localhost:3000/announcements');
+                const response = await fetch('/announcements');
                 const data = await response.json();
                 const section = document.getElementById('announcements-section');
 
@@ -196,7 +196,7 @@
         async function deleteAnnouncement(id) {
             if (!confirm('Delete this announcement?')) return;
             try {
-                const response = await fetch(`http://localhost:3000/announcements/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/announcements/${id}`, { method: 'DELETE' });
                 if (response.ok) {
                     showToast('Announcement deleted', 'success');
                     fetchAnnouncements();

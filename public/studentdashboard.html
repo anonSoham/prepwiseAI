@@ -482,7 +482,7 @@
         event.preventDefault();
         setActive(this);
         content.innerHTML = '<h2>Announcements</h2><p>Loading announcements...</p>';
-        fetch('http://localhost:3000/announcements')
+        fetch('/announcements')
           .then((response) => response.json())
           .then((data) => {
             if (data.length > 0) {
@@ -515,7 +515,7 @@
         let profile = { ...sd };
         if (sd.username) {
           try {
-            const res = await fetch(`http://localhost:3000/student/profile?username=${encodeURIComponent(sd.username)}`);
+            const res = await fetch(`/student/profile?username=${encodeURIComponent(sd.username)}`);
             if (res.ok) profile = await res.json();
           } catch (e) {}
         }
@@ -528,7 +528,7 @@
           ? `<span style="color:#166534;background:#f0fdf4;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600">&#10003; Resume saved</span>`
           : `<span style="color:#9a3412;background:#fff7ed;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600">&#9888; No resume yet</span>`;
         const viewPdfBtn = profile.resumePdf
-          ? `<a href="http://localhost:3000${profile.resumePdf}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:9px;font-size:12px;font-weight:600;text-decoration:none;margin-top:6px">&#128196; View Uploaded PDF</a>`
+          ? `<a href="${profile.resumePdf}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:9px;font-size:12px;font-weight:600;text-decoration:none;margin-top:6px">&#128196; View Uploaded PDF</a>`
           : '';
 
         content.innerHTML = `
@@ -623,7 +623,7 @@
           }
           const genderChecked = document.querySelector('input[name="pGender"]:checked');
           try {
-            const res = await fetch('http://localhost:3000/student/update', {
+            const res = await fetch('/student/update', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

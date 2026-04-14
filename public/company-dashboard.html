@@ -293,7 +293,7 @@
     <script>
         async function fetchAnnouncements() {
             try {
-                const response = await fetch('http://localhost:3000/announcements');
+                const response = await fetch('/announcements');
                 const data = await response.json();
                 const section = document.getElementById('announcement-section');
 
@@ -325,7 +325,7 @@
         async function deleteAnnouncement(id) {
             if (!confirm('Are you sure you want to delete this announcement?')) return;
             try {
-                const response = await fetch(`http://localhost:3000/announcements/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/announcements/${id}`, { method: 'DELETE' });
                 const data = await response.json();
                 if (response.status === 200) {
                     showToast(data.message || 'Announcement deleted', 'success');

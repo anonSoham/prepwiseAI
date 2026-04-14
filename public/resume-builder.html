@@ -850,7 +850,7 @@ async function saveToProfile() {
   btn.textContent = '⏳ Saving…';
   btn.disabled = true;
   try {
-    const res = await fetch('http://localhost:3000/students/' + username + '/resume', {
+    const res = await fetch('/students/' + username + '/resume', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resumeData, cgpa }),
@@ -889,7 +889,7 @@ async function uploadPdf(file) {
   formData.append('resume', file);
 
   try {
-    const res = await fetch('http://localhost:3000/students/' + username + '/resume/upload', {
+    const res = await fetch('/students/' + username + '/resume/upload', {
       method: 'POST',
       body: formData,
     });

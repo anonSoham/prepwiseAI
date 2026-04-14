@@ -257,7 +257,7 @@
 
         async function fetchStudentCount() {
             try {
-                const response = await fetch('http://localhost:3000/students/count');
+                const response = await fetch('/students/count');
                 const data = await response.json();
                 if (response.ok) {
                     document.getElementById('student-count').textContent = data.count;
@@ -269,7 +269,7 @@
 
         async function fetchStudents() {
             try {
-                const response = await fetch('http://localhost:3000/students');
+                const response = await fetch('/students');
                 const data = await response.json();
 
                 if (response.ok) {
@@ -318,7 +318,7 @@
             const phone = document.getElementById('editPhone').value;
             const department = document.getElementById('editDepartment').value;
             try {
-                const response = await fetch(`http://localhost:3000/students/${currentStudentUsername}`, {
+                const response = await fetch(`/students/${currentStudentUsername}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, email, phone, department }),
@@ -338,7 +338,7 @@
         async function deleteStudent(username) {
             if (!confirm('Are you sure you want to delete this student?')) return;
             try {
-                const response = await fetch(`http://localhost:3000/students/${username}`, { method: 'DELETE' });
+                const response = await fetch(`/students/${username}`, { method: 'DELETE' });
                 if (response.ok) {
                     showToast('Student deleted successfully', 'success');
                     fetchStudents();

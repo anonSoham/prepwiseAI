@@ -306,7 +306,7 @@
         const sd = checkAuth();
         if (!sd) return;
         try {
-            const res = await fetch(`http://localhost:3000/student/profile?username=${sd.username}`);
+            const res = await fetch(`/student/profile?username=${sd.username}`);
             if (!res.ok) throw new Error('Failed to fetch');
             const d = await res.json();
             originalData = { ...d };
@@ -401,7 +401,7 @@
         const btn = document.getElementById('save-btn');
         btn.textContent = 'Saving…'; btn.disabled = true;
         try {
-            const res = await fetch('http://localhost:3000/student/update', {
+            const res = await fetch('/student/update', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

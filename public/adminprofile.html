@@ -225,7 +225,7 @@
             if (!adminData) return;
 
             try {
-                const response = await fetch(`http://localhost:3000/admin/profile?username=${adminData.username}`);
+                const response = await fetch(`/admin/profile?username=${adminData.username}`);
                 if (!response.ok) throw new Error("Failed to fetch profile");
 
                 const profileData = await response.json();
@@ -267,7 +267,7 @@
             };
 
             try {
-                const response = await fetch('http://localhost:3000/admin/update', {
+                const response = await fetch('/admin/update', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(updatedProfile)

@@ -293,7 +293,7 @@
 
     async function fetchStudents() {
         try {
-            const res = await fetch('http://localhost:3000/students');
+            const res = await fetch('/students');
             allStudents = await res.json();
             updateStats();
             applyFilters();
@@ -374,7 +374,7 @@
                 : `<span class="cgpa-na">Not set</span>`;
             let resumeBtn;
             if (s.resumePdf) {
-                resumeBtn = `<a href="http://localhost:3000${s.resumePdf}" target="_blank" class="btn-resume"><i data-lucide="file-text"></i> View PDF</a>`;
+                resumeBtn = `<a href="${s.resumePdf}" target="_blank" class="btn-resume"><i data-lucide="file-text"></i> View PDF</a>`;
             } else if (s.resumeData) {
                 resumeBtn = `<a href="view-resume.html?username=${encodeURIComponent(s.username)}" target="_blank" class="btn-resume"><i data-lucide="file-text"></i> View Resume</a>`;
             } else {
