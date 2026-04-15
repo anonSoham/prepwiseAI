@@ -405,7 +405,7 @@ async function initCameraOnLoad() {
   await new Promise(r => setTimeout(r, 800)); // let video stabilise
   const warmup = await detectFaces(setupVideo);
   if (warmup === -1) {
-    camLoading.innerHTML = '⚠ Face detection API unavailable. Start the server with <code>npm start</code>.';
+    camLoading.innerHTML = '⚠ Face detection unavailable. You may still proceed with the quiz.';
     startBtn.disabled = false; startBtn.style.opacity = '1'; startBtn.style.cursor = 'pointer';
     return;
   }

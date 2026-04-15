@@ -301,7 +301,7 @@ async function detectFaces(videoEl) {
   // 2. Warm-up API check
   const warmup = await detectFaces(video);
   if (warmup === -1) {
-    faceStatus.textContent = '⚠ Face detection API unavailable — start the server';
+    faceStatus.textContent = '⚠ Face detection unavailable. You may still proceed.';
     faceStatus.style.color = '#f87171';
     startBtn.disabled = false; startBtn.style.opacity = '1'; startBtn.style.cursor = 'pointer';
     return;

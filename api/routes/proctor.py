@@ -1,21 +1,11 @@
-"""Server-side face detection for proctoring via MediaPipe."""
+"""Server-side face detection for proctoring via OpenCV Haar Cascade."""
 from fastapi import APIRouter, UploadFile, File
 import cv2
 import numpy as np
 
 router = APIRouter()
 
-_detector = None
-
-def _get_detector():
-    global _detector
-    if _detector is None:
-        import mediapipe as mp
-        _detector = mp.solutions.face_detection.FaceDetection(
-            model_selection=0,          # 0 = short-range (< 2 m), ideal for webcam
-            min_detection_confidence=0.5,
-        )
-    return _detector
+_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 
 @router.post("/detect")
@@ -26,9 +16,8 @@ async def detect_faces(file: UploadFile = File(...)):
     if img is None:
         return {"faces": -1, "error": "Could not decode frame"}
     try:
-        rgb     = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = _get_detector().process(rgb)
-        n = len(results.detections) if results.detections else 0
-        return {"faces": n}
+        gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = _cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        return {"faces": int(len(faces))}
     except Exception as e:
         return {"faces": -1, "error": str(e)}
