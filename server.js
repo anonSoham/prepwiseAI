@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 require('dotenv').config();
 
 const app = express();
@@ -19,6 +20,14 @@ app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     next();
 });
+
+// Proxy /api/* to Python FastAPI (set PYTHON_API_URL env var to deployed URL)
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000';
+app.use('/api', createProxyMiddleware({
+    target: PYTHON_API_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api': '/api' },
+}));
 
 // Serve frontend files from public/
 app.use(express.static(path.join(__dirname, 'public')));

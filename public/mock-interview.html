@@ -244,7 +244,7 @@
 </div><!-- end .layout -->
 
 <script>
-const API = 'http://localhost:8000';
+const API = '';
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const urlUsername = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('inp-username').value = urlUsername;

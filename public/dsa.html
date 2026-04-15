@@ -239,7 +239,7 @@
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
 
 <script>
-const API = 'http://localhost:8000';
+const API = '';
 const sd  = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('hdr-user').textContent = username ? `👤 ${username}` : '';
