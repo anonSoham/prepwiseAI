@@ -239,17 +239,23 @@
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
 
 <script>
+// Data endpoints (problems, stats, performance) are served by Node.js — instant.
+// Only code execution (/api/dsa/execute) hits Render, warmed up lazily on first Run.
 let API = '';
 const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
 
-async function waitForServer() {
-  await configReady;
-  if (!API) return;
-  for (let i = 0; i < 12; i++) {
-    try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
-  }
+let executorReady = null;
+function warmExecutor() {
+  if (executorReady) return executorReady;
+  executorReady = (async () => {
+    await configReady;
+    if (!API) return;
+    for (let i = 0; i < 12; i++) {
+      try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
+    }
+  })();
+  return executorReady;
 }
-const serverReady = waitForServer();
 
 const sd  = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
@@ -283,10 +289,8 @@ function loadCachedStats() {
 
 loadCachedStats();
 
-serverReady.then(() => {
-  loadFilters();
-  loadProblems();
-});
+loadFilters();
+loadProblems();
 
 if (username) loadStats().then(() => {
   const autoQid = parseInt(new URLSearchParams(location.search).get('qid'));
@@ -302,8 +306,8 @@ document.getElementById('perf-btn').addEventListener('click', () => {
 // ── Load filters ──
 async function loadFilters() {
   const [diffs, topics] = await Promise.all([
-    fetch(`${API}/api/dsa/difficulties`).then(r => r.json()),
-    fetch(`${API}/api/dsa/topics`).then(r => r.json()),
+    fetch(`/api/dsa/difficulties`).then(r => r.json()),
+    fetch(`/api/dsa/topics`).then(r => r.json()),
   ]);
   const ds = document.getElementById('diff-filter');
   diffs.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; ds.appendChild(o); });
@@ -325,7 +329,7 @@ async function loadProblems() {
     topic: pageState.topic,
     page_size: 25,
   });
-  const data = await fetch(`${API}/api/dsa/problems?${params}`).then(r => r.json());
+  const data = await fetch(`/api/dsa/problems?${params}`).then(r => r.json());
   pageState.total = data.total;
 
   tbody.innerHTML = '';
@@ -356,16 +360,14 @@ async function loadProblems() {
 }
 
 async function loadStats() {
-  await serverReady;
   try {
-    const res = await fetch(`${API}/api/dsa/stats/${username}`);
+    const res = await fetch(`/api/dsa/stats/${username}`);
     if (!res.ok) throw new Error('Not ok');
     const serverStats = await res.json();
-    // Merge server stats with local cache (server is source of truth)
     userStats = { ...userStats, ...serverStats };
     localStorage.setItem('dsa_stats_' + username, JSON.stringify(userStats));
     loadProblems();
-  } catch { /* server unavailable — local cache already loaded */ }
+  } catch { /* fall back to local cache */ }
 }
 
 document.getElementById('prev-page-btn').addEventListener('click', () => { pageState.page--; loadProblems(); });
@@ -377,7 +379,7 @@ async function openProblem(qid) {
   document.getElementById('solver-view').style.display = 'flex';
   document.getElementById('prob-body').innerHTML = '<p style="color:#64748b">Loading…</p>';
 
-  const p = await fetch(`${API}/api/dsa/problem/${qid}`).then(r => r.json());
+  const p = await fetch(`/api/dsa/problem/${qid}`).then(r => r.json());
   currentProblem = p;
 
   document.getElementById('prob-title').textContent = p.title;
@@ -462,6 +464,9 @@ document.getElementById('run-btn').addEventListener('click', async () => {
     return;
   }
 
+  // Wake the executor (Render free tier cold start ~50s on first call)
+  await warmExecutor();
+
   try {
     const data = await fetch(`${API}/api/dsa/execute`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -517,7 +522,7 @@ async function autoSubmit(code, lang) {
   try { localStorage.setItem('dsa_stats_' + username, JSON.stringify(userStats)); } catch {}
 
   // Fire-and-forget API call — don't block navigation on it
-  fetch(`${API}/api/dsa/submit`, {
+  fetch(`/api/dsa/submit`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       username, qid: currentProblem.qid,

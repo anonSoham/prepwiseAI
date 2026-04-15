@@ -1,10 +1,9 @@
 {
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" }
+    { "src": "server.js", "use": "@vercel/node", "config": { "includeFiles": "data/**" } }
   ],
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://prepwise-ai-p5mz.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/server.js" }
   ],
   "headers": [

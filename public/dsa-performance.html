@@ -219,21 +219,7 @@
 </div>
 
 <script>
-let API = '';
-const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
-
-// Wake up Render (free tier sleeps after inactivity — can take 50+ sec to start)
-async function waitForServer(statusEl) {
-  await configReady;
-  if (!API) return;
-  for (let i = 1; i <= 12; i++) {
-    try {
-      const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) });
-      if (r.ok) return; // server is up
-    } catch {}
-    if (statusEl) statusEl.innerHTML = `<div class="empty"><div class="e-icon">⏳</div><h3>Server warming up… (${i * 8}s / ~50s)</h3><p>Render's free tier sleeps when idle. Please wait.</p></div>`;
-  }
-}
+// Performance data is served by Node.js (MongoDB + local CSV) — no Render dependency.
 
 const params = new URLSearchParams(location.search);
 let username = params.get('username') || '';
@@ -256,42 +242,20 @@ if (!username) {
 
 async function loadPerformance() {
   const mainContent = document.getElementById('main-content');
-  mainContent.innerHTML = '<div class="empty"><div class="e-icon">⏳</div><h3>Connecting…</h3><p>Waking up the server (free tier sleeps when idle — may take ~50s). Please wait.</p></div>';
-  await waitForServer(mainContent);
-
-  await configReady;
-  if (!API) {
-    mainContent.innerHTML = '<div class="empty"><div class="e-icon">&#9888;</div><h3>Configuration error</h3><p>Could not reach the API. Please try again.</p></div>';
-    return;
-  }
 
   let data = null;
   try {
-    const res = await fetch(`${API}/api/dsa/performance/${encodeURIComponent(username)}`);
+    const res = await fetch(`/api/dsa/performance/${encodeURIComponent(username)}`);
     if (!res.ok) throw new Error('Not ok');
     data = await res.json();
   } catch {
-    // Show cached stats from localStorage as fallback
-    const cached = localStorage.getItem('dsa_stats_' + username);
-    if (cached) {
-      const stats = JSON.parse(cached);
-      const count = Object.keys(stats).length;
-      mainContent.innerHTML = `
-        <div class="empty">
-          <div class="e-icon">&#128202;</div>
-          <h3>${count} problem${count !== 1 ? 's' : ''} solved (cached)</h3>
-          <p>Server is unavailable right now. Showing locally saved data.<br>
-          <a href="dsa-performance.html?username=${encodeURIComponent(username)}" style="color:#6366f1">Retry</a> when server is back up.</p>
-        </div>`;
-    } else {
-      mainContent.innerHTML = `
-        <div class="empty">
-          <div class="e-icon">&#9888;</div>
-          <h3>Server unavailable</h3>
-          <p>The server took too long to respond.<br>
-          <a href="dsa-performance.html?username=${encodeURIComponent(username)}" style="color:#6366f1">Click here to retry</a></p>
-        </div>`;
-    }
+    mainContent.innerHTML = `
+      <div class="empty">
+        <div class="e-icon">&#9888;</div>
+        <h3>Could not load performance</h3>
+        <p>Please try again in a moment.<br>
+        <a href="dsa-performance.html?username=${encodeURIComponent(username)}" style="color:#6366f1">Retry</a></p>
+      </div>`;
     return;
   }
 

@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { parse: parseCsv } = require('csv-parse/sync');
 require('dotenv').config();
 
 const app = express();
@@ -648,6 +649,224 @@ app.post('/company/announcements', async (req, res) => {
         res.status(201).json({ message: 'Announcement created successfully by company' });
     } catch (error) {
         res.status(500).json({ message: 'Error creating announcement', error });
+    }
+});
+
+// ── DSA data routes (moved from Python/Render to eliminate cold-start latency) ──
+// Code execution (/api/dsa/execute) still runs on Python/Render since it needs the sandbox.
+
+const DSA_CSV_PATH = path.join(__dirname, 'data', 'dsa', 'question_details.csv');
+let _dsaCache = null;
+
+function parseListField(raw) {
+    if (!raw) return [];
+    const s = String(raw).trim();
+    if (!s || s === 'nan') return [];
+    return s.replace(/^\[|\]$/g, '')
+        .split(',')
+        .map(t => t.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean);
+}
+
+function loadDsaProblems() {
+    if (_dsaCache) return _dsaCache;
+    const raw = fs.readFileSync(DSA_CSV_PATH, 'utf8');
+    const rows = parseCsv(raw, { columns: true, skip_empty_lines: true, relax_quotes: true, relax_column_count: true });
+    _dsaCache = rows
+        .filter(r => {
+            const paid = String(r.isPaidOnly || '').toLowerCase();
+            return paid !== 'true';
+        })
+        .map(r => ({
+            qid: parseInt(r.QID, 10),
+            title: r.title,
+            difficulty: r.difficulty,
+            topics: parseListField(r.topics),
+            hints: parseListField(r.Hints).filter(h => h.length > 5),
+            body: r.Body || '',
+            code: r.Code || '',
+        }))
+        .filter(p => !isNaN(p.qid));
+    return _dsaCache;
+}
+
+function cleanHtml(raw) {
+    const entities = { '&nbsp;': ' ', '&quot;': '"', '&gt;': '>', '&lt;': '<', '&amp;': '&' };
+    let out = String(raw || '');
+    for (const [k, v] of Object.entries(entities)) out = out.split(k).join(v);
+    return out.replace(/<[\s\S]*?>/g, '');
+}
+
+function extractTestCases(text) {
+    const inputs = [...text.matchAll(/Input:\s*(.+?)(?:\n|$)/gi)].map(m => m[1].trim());
+    const outputs = [...text.matchAll(/Output:\s*(.+?)(?:\n|$)/gi)].map(m => m[1].trim());
+    const n = Math.min(inputs.length, outputs.length);
+    return Array.from({ length: n }, (_, i) => ({ input: inputs[i], output: outputs[i] }));
+}
+
+function pythonTemplate(csvCode) {
+    const base = String(csvCode || '').trim();
+    if (base && base !== 'nan') {
+        let b = base;
+        if (!/\n\s{8}\S/.test(b)) b = b.replace(/\s+$/, '') + '\n        pass';
+        return 'from typing import List, Optional, Dict, Set, Tuple\n\n' + b + '\n';
+    }
+    return 'from typing import List, Optional, Dict, Set, Tuple\n\nclass Solution:\n    def solve(self):\n        pass\n';
+}
+
+const LANG_TEMPLATES = {
+    Java: 'import java.util.*;\n\npublic class Solution {\n    // Add your solution here\n}',
+    C: '#include <stdio.h>\n#include <stdlib.h>\n\nint main() {\n    // write your code here\n    return 0;\n}',
+    'C++': '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // write your code here\n    return 0;\n}',
+};
+
+// Submissions live in a separate database (DSA_code_app_db) to match the Python app
+const dsaSubmissionSchema = new mongoose.Schema({
+    username: String,
+    qid: Number,
+    difficulty: String,
+    topics: [String],
+    coding_lang: String,
+    time_taken: String,
+    status: String,
+    timestamp: { type: Date, default: Date.now },
+}, { collection: 'submissions' });
+
+let DsaSubmission = null;
+function getDsaSubmissionModel() {
+    if (DsaSubmission) return DsaSubmission;
+    const dsaConn = mongoose.connection.useDb('DSA_code_app_db', { useCache: true });
+    DsaSubmission = dsaConn.model('Submission', dsaSubmissionSchema);
+    return DsaSubmission;
+}
+
+app.get('/api/dsa/topics', (req, res) => {
+    try {
+        const set = new Set();
+        loadDsaProblems().forEach(p => p.topics.forEach(t => set.add(t)));
+        res.json([...set].sort());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dsa/difficulties', (req, res) => {
+    try {
+        const set = new Set();
+        loadDsaProblems().forEach(p => { if (p.difficulty) set.add(p.difficulty); });
+        res.json([...set].sort());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dsa/problems', (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.max(1, parseInt(req.query.page_size) || 25);
+        const difficulty = req.query.difficulty || '';
+        const topic = req.query.topic || '';
+
+        let items = loadDsaProblems();
+        if (difficulty && difficulty !== 'All') items = items.filter(p => p.difficulty === difficulty);
+        if (topic && topic !== 'All') items = items.filter(p => p.topics.includes(topic));
+
+        const total = items.length;
+        const start = (page - 1) * pageSize;
+        const chunk = items.slice(start, start + pageSize).map(p => ({
+            qid: p.qid, title: p.title, difficulty: p.difficulty, topics: p.topics.slice(0, 4),
+        }));
+
+        res.json({ problems: chunk, total, page, page_size: pageSize });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dsa/problem/:qid', (req, res) => {
+    try {
+        const qid = parseInt(req.params.qid, 10);
+        const p = loadDsaProblems().find(x => x.qid === qid);
+        if (!p) return res.json(null);
+
+        const bodyHtml = p.body;
+        const bodyText = cleanHtml(bodyHtml);
+        res.json({
+            qid: p.qid,
+            title: p.title,
+            difficulty: p.difficulty,
+            topics: p.topics,
+            body_html: bodyHtml,
+            test_cases: extractTestCases(bodyText),
+            hints: p.hints,
+            templates: {
+                Python: pythonTemplate(p.code),
+                Java: LANG_TEMPLATES.Java,
+                C: LANG_TEMPLATES.C,
+                'C++': LANG_TEMPLATES['C++'],
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/dsa/submit', async (req, res) => {
+    try {
+        const { username, qid, difficulty, topics, language, time_taken } = req.body;
+        const Sub = getDsaSubmissionModel();
+        await Sub.create({
+            username, qid, difficulty, topics,
+            coding_lang: language, time_taken, status: 'submitted', timestamp: new Date(),
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dsa/stats/:username', async (req, res) => {
+    try {
+        const Sub = getDsaSubmissionModel();
+        const subs = await Sub.find({ username: req.params.username }).lean();
+        const out = {};
+        subs.forEach(s => {
+            out[s.qid] = {
+                status: s.status,
+                time_taken: s.time_taken || '—',
+                language: s.coding_lang || '—',
+            };
+        });
+        res.json(out);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dsa/performance/:username', async (req, res) => {
+    try {
+        const Sub = getDsaSubmissionModel();
+        const subs = await Sub.find({ username: req.params.username }).lean();
+        const all = loadDsaProblems();
+        const byQid = new Map(all.map(p => [p.qid, p]));
+
+        const problems = subs.map(s => {
+            const p = byQid.get(s.qid);
+            return {
+                qid: s.qid,
+                title: p ? p.title : `Problem #${s.qid}`,
+                difficulty: p ? p.difficulty : (s.difficulty || '—'),
+                topics: p ? p.topics : (Array.isArray(s.topics) ? s.topics : []),
+                language: s.coding_lang || '—',
+                time_taken: s.time_taken || '—',
+                timestamp: s.timestamp ? new Date(s.timestamp).toISOString() : null,
+            };
+        });
+        problems.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+
+        res.json({ problems });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
