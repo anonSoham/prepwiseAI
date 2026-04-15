@@ -8,6 +8,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { parse: parseCsv } = require('csv-parse/sync');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
@@ -867,6 +868,131 @@ app.get('/api/dsa/performance/:username', async (req, res) => {
         res.json({ problems });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ── Mock Interview routes (moved from Python/Render) ──────────────────────────
+// Face detection (/api/proctor/detect) still runs on Render (needs OpenCV).
+
+const GEMINI_API_KEY   = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL_ID  = process.env.GEMINI_MODEL   || 'gemini-2.5-flash';
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+
+async function geminiCall(prompt) {
+    if (!genAI) throw new Error('GEMINI_API_KEY not configured');
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_ID });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+}
+
+// Interview sessions saved to mock_interviews DB (matches Python schema)
+const interviewFeedbackSchema = new mongoose.Schema({
+    username: String, role: String, question: String,
+    answer: String, feedback: String,
+    timestamp: { type: Date, default: Date.now },
+}, { collection: 'feedbacks' });
+
+const faceLotSchema = new mongoose.Schema({
+    student_id: String, violation: String,
+    timestamp: { type: Date, default: Date.now },
+}, { collection: 'face_logs' });
+
+const cheatingReportSchema = new mongoose.Schema({
+    student_id: String, test_type: String, role: String,
+    violation_count: Number, violations: Array, terminated: Boolean,
+    timestamp: { type: Date, default: Date.now },
+}, { collection: 'cheating_reports' });
+
+let _miConn = null;
+function getMiConn() {
+    if (!_miConn) _miConn = mongoose.connection.useDb('mock_interviews', { useCache: true });
+    return _miConn;
+}
+function getMiModel(name, schema) {
+    const conn = getMiConn();
+    return conn.models[name] || conn.model(name, schema);
+}
+
+app.post('/api/interview/generate', async (req, res) => {
+    const { role, stack, experience } = req.body;
+    try {
+        const prompt =
+            `Generate exactly 5 technical interview questions for a ${role} role.\n` +
+            `Tech stack: ${stack}. Candidate experience: ${experience} year(s).\n` +
+            `Format: number each question on its own line (e.g. '1. What is ...')\n` +
+            `Output ONLY the 5 questions, nothing else.`;
+        const text = await geminiCall(prompt);
+        const questions = text.split('\n')
+            .map(l => l.trim())
+            .filter(l => l && /^\d/.test(l))
+            .map(l => l.replace(/^\d+[\.\)]\s*/, '').trim())
+            .filter(Boolean)
+            .slice(0, 5);
+        if (!questions.length) return res.json({ error: 'Could not generate questions. Please try again.' });
+        res.json({ questions });
+    } catch (err) {
+        if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+            return res.json({ error: 'API quota exceeded. Please wait a moment and try again.' });
+        }
+        res.json({ error: `API error: ${err.message}` });
+    }
+});
+
+app.post('/api/interview/evaluate', async (req, res) => {
+    const { question, answer } = req.body;
+    if (!answer?.trim()) return res.json({ feedback: 'No answer provided.' });
+    try {
+        const prompt =
+            `Evaluate this interview answer concisely.\n\n` +
+            `Question: ${question}\nAnswer: ${answer}\n\n` +
+            `Respond with:\nScore: X/10\nFeedback: [2-3 sentences of specific feedback]`;
+        const feedback = await geminiCall(prompt);
+        res.json({ feedback });
+    } catch (err) {
+        if (err.message?.includes('RESOURCE_EXHAUSTED')) {
+            return res.json({ feedback: '⚠️ API quota exceeded. Feedback unavailable — try again later.' });
+        }
+        res.json({ feedback: `⚠️ Error generating feedback: ${err.message}` });
+    }
+});
+
+app.post('/api/interview/save', async (req, res) => {
+    const { username, role, stack, experience, responses } = req.body;
+    try {
+        const Feedback = getMiModel('Feedback', interviewFeedbackSchema);
+        const docs = (responses || []).map(r => ({
+            username, role, question: r.question,
+            answer: r.answer, feedback: r.feedback, timestamp: new Date(),
+        }));
+        if (docs.length) await Feedback.insertMany(docs);
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/interview/log-violation', async (req, res) => {
+    const { username, violation } = req.body;
+    try {
+        const FaceLog = getMiModel('FaceLog', faceLotSchema);
+        await FaceLog.create({ student_id: username, violation, timestamp: new Date() });
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/interview/terminate', async (req, res) => {
+    const { username, role, violation_count, violations } = req.body;
+    try {
+        const Report = getMiModel('CheatingReport', cheatingReportSchema);
+        await Report.create({
+            student_id: username, test_type: 'interview', role,
+            violation_count, violations, terminated: true, timestamp: new Date(),
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 

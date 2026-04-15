@@ -244,18 +244,10 @@
 </div><!-- end .layout -->
 
 <script>
-let API = '';
+// Interview generate/evaluate/save use Node.js (relative URLs) — no Render needed.
+// Only face detection (PROCTOR_API) still hits Render.
 let PROCTOR_API = '';
-const configReady = fetch('/config').then(r => r.json()).then(c => { API = PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
-
-async function waitForServer() {
-  await configReady;
-  if (!API) return;
-  for (let i = 0; i < 12; i++) {
-    try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
-  }
-}
-const serverReady = waitForServer();
+const configReady = fetch('/config').then(r => r.json()).then(c => { PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
 
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const urlUsername = new URLSearchParams(location.search).get('username') || sd.username || '';
@@ -308,8 +300,8 @@ async function detectFaces(videoEl) {
   }
 
   faceStatus.textContent = '⏳ Waiting for server…';
+  await configReady;
   await new Promise(r => setTimeout(r, 800));
-  await serverReady;
   const warmup = await detectFaces(video);
   if (warmup === -1) {
     faceStatus.textContent = '⚠ Face detection unavailable. You may still proceed.';
@@ -361,7 +353,7 @@ async function runDetection() {
     badge.textContent = `${violationCount} / 5`;
     badge.className = 'viol-count-badge' + (violationCount >= 3 ? ' danger' : '');
     if (iState.username) {
-      fetch(`${API}/api/interview/log-violation`, {
+      fetch(`/api/interview/log-violation`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: iState.username, violation: violationType }),
       }).catch(() => {});
@@ -378,7 +370,7 @@ async function terminateInterview() {
   clearInterval(procInterval); procInterval = null;
 
   if (iState.username) {
-    fetch(`${API}/api/interview/terminate`, {
+    fetch(`/api/interview/terminate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username:        iState.username,
@@ -417,7 +409,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   btn.innerHTML = '<div class="spinner"></div> Generating questions…'; btn.disabled = true;
 
   try {
-    const data = await fetch(`${API}/api/interview/generate`, {
+    const data = await fetch(`/api/interview/generate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role, stack, experience: exp }),
     }).then(r => r.json());
@@ -513,7 +505,7 @@ document.getElementById('next-btn').addEventListener('click', async () => {
 
   let feedback = 'No feedback available.';
   try {
-    const res = await fetch(`${API}/api/interview/evaluate`, {
+    const res = await fetch(`/api/interview/evaluate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q, answer }),
     }).then(r => r.json());
@@ -545,7 +537,7 @@ document.getElementById('next-btn').addEventListener('click', async () => {
 
 async function saveInterview() {
   try {
-    await fetch(`${API}/api/interview/save`, {
+    await fetch(`/api/interview/save`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: iState.username, role: iState.role,
