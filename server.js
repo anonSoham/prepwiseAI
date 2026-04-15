@@ -566,8 +566,11 @@ app.post('/students/:username/resume/upload', (req, res) => {
     });
 });
 
-// Serve uploaded resumes
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve uploaded resumes — use /tmp on Vercel, local uploads/ otherwise
+const uploadsServeDir = process.env.VERCEL
+    ? '/tmp'
+    : path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsServeDir));
 
 // Company Registration Route
 app.post('/company/register', async (req, res) => {
