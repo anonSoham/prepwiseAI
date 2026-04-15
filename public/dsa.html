@@ -332,11 +332,17 @@ async function loadProblems() {
 }
 
 async function loadStats() {
-  try {
-    const data = await fetch(`${API}/api/dsa/stats/${username}`).then(r => r.json());
-    userStats = data;
-    loadProblems(); // re-render list with solved badges
-  } catch { /* offline — ignore */ }
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const res = await fetch(`${API}/api/dsa/stats/${username}`);
+      if (!res.ok) throw new Error('Not ok');
+      userStats = await res.json();
+      loadProblems(); // re-render list with solved badges
+      return;
+    } catch {
+      if (attempt < 5) await new Promise(r => setTimeout(r, 6000));
+    }
+  }
 }
 
 document.getElementById('prev-page-btn').addEventListener('click', () => { pageState.page--; loadProblems(); });

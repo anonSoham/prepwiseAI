@@ -240,26 +240,40 @@ if (!username) {
 }
 
 async function loadPerformance() {
-  try {
-    const data = await fetch(`${API}/api/dsa/performance/${encodeURIComponent(username)}`).then(r => r.json());
-    const problems = data.problems || [];
+  const mainContent = document.getElementById('main-content');
+  let data = null;
 
-    document.getElementById('sub-text').textContent =
-      problems.length ? `Showing all ${problems.length} problem${problems.length !== 1 ? 's' : ''} solved by ${username}` : '';
-
-    if (!problems.length) {
-      document.getElementById('main-content').innerHTML =
-        '<div class="empty"><div class="e-icon">&#128187;</div><h3>No problems solved yet</h3>' +
-        '<p>Head to <a href="dsa.html">Practice Problems</a> and start solving!</p></div>';
-      return;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      mainContent.innerHTML = `<div class="empty"><div class="e-icon">⏳</div><h3>Loading${attempt > 1 ? ` (attempt ${attempt}/5)` : ''}…</h3><p>Waking up the server, please wait.</p></div>`;
+      const res = await fetch(`${API}/api/dsa/performance/${encodeURIComponent(username)}`);
+      if (!res.ok) throw new Error('Not ok');
+      data = await res.json();
+      break;
+    } catch(e) {
+      if (attempt < 5) await new Promise(r => setTimeout(r, 6000));
     }
-
-    renderDashboard(problems);
-  } catch(e) {
-    document.getElementById('main-content').innerHTML =
-      '<div class="empty"><div class="e-icon">&#9888;</div><h3>Could not load data</h3>' +
-      '<p>Make sure the API server is running (npm start).</p></div>';
   }
+
+  if (!data) {
+    mainContent.innerHTML =
+      '<div class="empty"><div class="e-icon">&#9888;</div><h3>Could not load data</h3>' +
+      '<p>The server is unavailable. Please try again in a moment.</p></div>';
+    return;
+  }
+
+  const problems = data.problems || [];
+  document.getElementById('sub-text').textContent =
+    problems.length ? `Showing all ${problems.length} problem${problems.length !== 1 ? 's' : ''} solved by ${username}` : '';
+
+  if (!problems.length) {
+    mainContent.innerHTML =
+      '<div class="empty"><div class="e-icon">&#128187;</div><h3>No problems solved yet</h3>' +
+      '<p>Head to <a href="dsa.html">Practice Problems</a> and start solving!</p></div>';
+    return;
+  }
+
+  renderDashboard(problems);
 }
 
 function renderDashboard(problems) {
