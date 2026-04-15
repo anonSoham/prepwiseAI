@@ -222,6 +222,19 @@
 let API = '';
 const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
 
+// Wake up Render (free tier sleeps after inactivity — can take 50+ sec to start)
+async function waitForServer(statusEl) {
+  await configReady;
+  if (!API) return;
+  for (let i = 1; i <= 12; i++) {
+    try {
+      const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) return; // server is up
+    } catch {}
+    if (statusEl) statusEl.innerHTML = `<div class="empty"><div class="e-icon">⏳</div><h3>Server warming up… (${i * 8}s / ~50s)</h3><p>Render's free tier sleeps when idle. Please wait.</p></div>`;
+  }
+}
+
 const params = new URLSearchParams(location.search);
 let username = params.get('username') || '';
 
@@ -242,26 +255,19 @@ if (!username) {
 }
 
 async function loadPerformance() {
-  await configReady;
   const mainContent = document.getElementById('main-content');
+  mainContent.innerHTML = '<div class="empty"><div class="e-icon">⏳</div><h3>Connecting…</h3><p>Starting up the server, please wait.</p></div>';
+  await waitForServer(mainContent);
+
   let data = null;
-
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      mainContent.innerHTML = `<div class="empty"><div class="e-icon">⏳</div><h3>Loading${attempt > 1 ? ` (attempt ${attempt}/5)` : ''}…</h3><p>Waking up the server, please wait.</p></div>`;
-      const res = await fetch(`${API}/api/dsa/performance/${encodeURIComponent(username)}`);
-      if (!res.ok) throw new Error('Not ok');
-      data = await res.json();
-      break;
-    } catch(e) {
-      if (attempt < 5) await new Promise(r => setTimeout(r, 6000));
-    }
-  }
-
-  if (!data) {
+  try {
+    const res = await fetch(`${API}/api/dsa/performance/${encodeURIComponent(username)}`);
+    if (!res.ok) throw new Error('Not ok');
+    data = await res.json();
+  } catch {
     mainContent.innerHTML =
       '<div class="empty"><div class="e-icon">&#9888;</div><h3>Could not load data</h3>' +
-      '<p>The server is unavailable. Please try again in a moment.</p></div>';
+      '<p>The server is unavailable. Please try refreshing the page.</p></div>';
     return;
   }
 

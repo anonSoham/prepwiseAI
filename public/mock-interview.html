@@ -248,6 +248,15 @@ let API = '';
 let PROCTOR_API = '';
 const configReady = fetch('/config').then(r => r.json()).then(c => { API = PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
 
+async function waitForServer() {
+  await configReady;
+  if (!API) return;
+  for (let i = 0; i < 12; i++) {
+    try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
+  }
+}
+const serverReady = waitForServer();
+
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const urlUsername = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('inp-username').value = urlUsername;
@@ -298,16 +307,10 @@ async function detectFaces(videoEl) {
     return;
   }
 
-  faceStatus.textContent = '⏳ Connecting to face detection…';
+  faceStatus.textContent = '⏳ Waiting for server…';
   await new Promise(r => setTimeout(r, 800));
-
-  // 2. Warm-up API check — retry up to 5x to handle Render cold start
-  let warmup = -1;
-  for (let i = 0; i < 5 && warmup === -1; i++) {
-    faceStatus.textContent = `⏳ Connecting to face detection${i > 0 ? ` (attempt ${i + 1}/5)` : ''}…`;
-    warmup = await detectFaces(video);
-    if (warmup === -1 && i < 4) await new Promise(r => setTimeout(r, 6000));
-  }
+  await serverReady;
+  const warmup = await detectFaces(video);
   if (warmup === -1) {
     faceStatus.textContent = '⚠ Face detection unavailable. You may still proceed.';
     faceStatus.style.color = '#f87171';

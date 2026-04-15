@@ -311,6 +311,15 @@ let API = '';
 let PROCTOR_API = '';
 const configReady = fetch('/config').then(r => r.json()).then(c => { API = PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
 
+async function waitForServer() {
+  await configReady;
+  if (!API) return;
+  for (let i = 0; i < 12; i++) {
+    try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
+  }
+}
+const serverReady = waitForServer();
+
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
 
@@ -337,7 +346,7 @@ lucide.createIcons();
 initCameraOnLoad(); // start camera + face detection on page load
 
 async function startQuiz() {
-  await configReady;
+  await serverReady;
   state.category = document.querySelector('input[name="category"]:checked').value;
   state.count    = parseInt(document.querySelector('input[name="mode"]:checked').value);
 
@@ -405,14 +414,11 @@ async function initCameraOnLoad() {
   camWrap.style.display = 'block';
   camLoading.textContent = '⏳ Connecting to face detection…';
 
-  // 2. Warm-up check — retry up to 5x to handle Render cold start (~30s)
+  // 2. Wait for server then check face detection
   await new Promise(r => setTimeout(r, 800)); // let video stabilise
-  let warmup = -1;
-  for (let i = 0; i < 5 && warmup === -1; i++) {
-    camLoading.textContent = `⏳ Connecting to face detection${i > 0 ? ` (attempt ${i + 1}/5)` : ''}…`;
-    warmup = await detectFaces(setupVideo);
-    if (warmup === -1 && i < 4) await new Promise(r => setTimeout(r, 6000));
-  }
+  camLoading.textContent = '⏳ Waiting for server…';
+  await serverReady;
+  const warmup = await detectFaces(setupVideo);
   if (warmup === -1) {
     camLoading.innerHTML = '⚠ Face detection unavailable. You may still proceed with the quiz.';
     startBtn.disabled = false; startBtn.style.opacity = '1'; startBtn.style.cursor = 'pointer';

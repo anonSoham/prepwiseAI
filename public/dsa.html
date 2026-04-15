@@ -242,6 +242,15 @@
 let API = '';
 const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
 
+async function waitForServer() {
+  await configReady;
+  if (!API) return;
+  for (let i = 0; i < 12; i++) {
+    try { const r = await fetch(`${API}/`, { signal: AbortSignal.timeout(8000) }); if (r.ok) return; } catch {}
+  }
+}
+const serverReady = waitForServer();
+
 const sd  = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('hdr-user').textContent = username ? `👤 ${username}` : '';
@@ -263,7 +272,7 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
-configReady.then(() => {
+serverReady.then(() => {
   loadFilters();
   loadProblems();
 });
@@ -336,7 +345,7 @@ async function loadProblems() {
 }
 
 async function loadStats() {
-  await configReady;
+  await serverReady;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       const res = await fetch(`${API}/api/dsa/stats/${username}`);
