@@ -308,6 +308,9 @@
 
 <script>
 const API = '';
+let PROCTOR_API = ''; // Set from /config — calls Render directly to bypass Vercel timeout
+fetch('/config').then(r => r.json()).then(c => { PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
+
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
 
@@ -374,7 +377,7 @@ async function detectFaces(videoEl) {
     const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
     const form = new FormData();
     form.append('file', blob, 'frame.jpg');
-    const res = await fetch(`${API}/api/proctor/detect`, { method: 'POST', body: form });
+    const res = await fetch(`${PROCTOR_API}/api/proctor/detect`, { method: 'POST', body: form });
     if (!res.ok) return -1;
     const data = await res.json();
     return data.faces ?? -1;
@@ -401,9 +404,14 @@ async function initCameraOnLoad() {
   camWrap.style.display = 'block';
   camLoading.textContent = '⏳ Connecting to face detection…';
 
-  // 2. Warm-up check to confirm API is reachable
+  // 2. Warm-up check — retry up to 5x to handle Render cold start (~30s)
   await new Promise(r => setTimeout(r, 800)); // let video stabilise
-  const warmup = await detectFaces(setupVideo);
+  let warmup = -1;
+  for (let i = 0; i < 5 && warmup === -1; i++) {
+    camLoading.textContent = `⏳ Connecting to face detection${i > 0 ? ` (attempt ${i + 1}/5)` : ''}…`;
+    warmup = await detectFaces(setupVideo);
+    if (warmup === -1 && i < 4) await new Promise(r => setTimeout(r, 6000));
+  }
   if (warmup === -1) {
     camLoading.innerHTML = '⚠ Face detection unavailable. You may still proceed with the quiz.';
     startBtn.disabled = false; startBtn.style.opacity = '1'; startBtn.style.cursor = 'pointer';

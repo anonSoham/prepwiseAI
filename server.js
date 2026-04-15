@@ -582,6 +582,11 @@ app.get('/students/:username/resume/pdf', async (req, res) => {
     }
 });
 
+// Expose Python API URL to frontend (used for direct proctor calls)
+app.get('/config', (req, res) => {
+    res.json({ pythonApiUrl: PYTHON_API_URL });
+});
+
 // Company Registration Route
 app.post('/company/register', async (req, res) => {
     try {

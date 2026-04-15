@@ -245,6 +245,9 @@
 
 <script>
 const API = '';
+let PROCTOR_API = '';
+fetch('/config').then(r => r.json()).then(c => { PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
+
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const urlUsername = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('inp-username').value = urlUsername;
@@ -272,7 +275,7 @@ async function detectFaces(videoEl) {
     const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
     const form = new FormData();
     form.append('file', blob, 'frame.jpg');
-    const res = await fetch(`${API}/api/proctor/detect`, { method: 'POST', body: form });
+    const res = await fetch(`${PROCTOR_API}/api/proctor/detect`, { method: 'POST', body: form });
     if (!res.ok) return -1;
     const data = await res.json();
     return data.faces ?? -1;
@@ -298,8 +301,13 @@ async function detectFaces(videoEl) {
   faceStatus.textContent = '⏳ Connecting to face detection…';
   await new Promise(r => setTimeout(r, 800));
 
-  // 2. Warm-up API check
-  const warmup = await detectFaces(video);
+  // 2. Warm-up API check — retry up to 5x to handle Render cold start
+  let warmup = -1;
+  for (let i = 0; i < 5 && warmup === -1; i++) {
+    faceStatus.textContent = `⏳ Connecting to face detection${i > 0 ? ` (attempt ${i + 1}/5)` : ''}…`;
+    warmup = await detectFaces(video);
+    if (warmup === -1 && i < 4) await new Promise(r => setTimeout(r, 6000));
+  }
   if (warmup === -1) {
     faceStatus.textContent = '⚠ Face detection unavailable. You may still proceed.';
     faceStatus.style.color = '#f87171';
