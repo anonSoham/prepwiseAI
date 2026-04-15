@@ -272,12 +272,23 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
+// Load solved status from localStorage immediately (instant, no server needed)
+function loadCachedStats() {
+  if (!username) return;
+  try {
+    const cached = localStorage.getItem('dsa_stats_' + username);
+    if (cached) { userStats = JSON.parse(cached); }
+  } catch {}
+}
+
+loadCachedStats();
+
 serverReady.then(() => {
   loadFilters();
   loadProblems();
 });
+
 if (username) loadStats().then(() => {
-  // If ?qid= in URL, auto-open that problem (e.g. from performance page "Revisit")
   const autoQid = parseInt(new URLSearchParams(location.search).get('qid'));
   if (autoQid) openProblem(autoQid);
 });
@@ -346,17 +357,15 @@ async function loadProblems() {
 
 async function loadStats() {
   await serverReady;
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      const res = await fetch(`${API}/api/dsa/stats/${username}`);
-      if (!res.ok) throw new Error('Not ok');
-      userStats = await res.json();
-      loadProblems(); // re-render list with solved badges
-      return;
-    } catch {
-      if (attempt < 5) await new Promise(r => setTimeout(r, 6000));
-    }
-  }
+  try {
+    const res = await fetch(`${API}/api/dsa/stats/${username}`);
+    if (!res.ok) throw new Error('Not ok');
+    const serverStats = await res.json();
+    // Merge server stats with local cache (server is source of truth)
+    userStats = { ...userStats, ...serverStats };
+    localStorage.setItem('dsa_stats_' + username, JSON.stringify(userStats));
+    loadProblems();
+  } catch { /* server unavailable — local cache already loaded */ }
 }
 
 document.getElementById('prev-page-btn').addEventListener('click', () => { pageState.page--; loadProblems(); });
@@ -503,8 +512,9 @@ async function autoSubmit(code, lang) {
   const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const s = String(elapsed % 60).padStart(2, '0');
 
-  // Mark as solved locally right away
+  // Mark as solved locally and persist to localStorage immediately
   userStats[currentProblem.qid] = { status: 'submitted', time_taken: `${m}:${s}`, language: lang };
+  try { localStorage.setItem('dsa_stats_' + username, JSON.stringify(userStats)); } catch {}
 
   // Fire-and-forget API call — don't block navigation on it
   fetch(`${API}/api/dsa/submit`, {
