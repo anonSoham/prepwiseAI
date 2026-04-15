@@ -496,22 +496,31 @@ function renderTestResults(results) {
 
 async function autoSubmit(code, lang) {
   if (!username || !currentProblem) return;
+
+  // Stop timer immediately
+  clearInterval(solverTimerInterval);
   const elapsed = Math.floor((Date.now() - solverStartTime) / 1000);
-  const m = String(Math.floor(elapsed/60)).padStart(2,'0');
-  const s = String(elapsed%60).padStart(2,'0');
-  try {
-    await fetch(`${API}/api/dsa/submit`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username, qid: currentProblem.qid,
-        difficulty: currentProblem.difficulty,
-        topics: currentProblem.topics,
-        language: lang, time_taken: `${m}:${s}`,
-      }),
-    });
-    userStats[currentProblem.qid] = { status: 'submitted', time_taken: `${m}:${s}`, language: lang };
-    document.getElementById('submit-btn').textContent = '🎉 Solved!';
-  } catch { /* ignore */ }
+  const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+
+  // Mark as solved locally right away
+  userStats[currentProblem.qid] = { status: 'submitted', time_taken: `${m}:${s}`, language: lang };
+
+  // Fire-and-forget API call — don't block navigation on it
+  fetch(`${API}/api/dsa/submit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username, qid: currentProblem.qid,
+      difficulty: currentProblem.difficulty,
+      topics: currentProblem.topics,
+      language: lang, time_taken: `${m}:${s}`,
+    }),
+  }).catch(() => {});
+
+  // Navigate back to problem list with solved badge updated
+  document.getElementById('solver-view').style.display = 'none';
+  document.getElementById('list-view').style.display   = '';
+  loadProblems();
 }
 
 document.getElementById('submit-btn').addEventListener('click', async () => {
