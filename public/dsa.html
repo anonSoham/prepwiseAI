@@ -239,7 +239,9 @@
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
 
 <script>
-const API = '';
+let API = '';
+const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
+
 const sd  = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
 document.getElementById('hdr-user').textContent = username ? `👤 ${username}` : '';
@@ -261,8 +263,10 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
-loadFilters();
-loadProblems();
+configReady.then(() => {
+  loadFilters();
+  loadProblems();
+});
 if (username) loadStats().then(() => {
   // If ?qid= in URL, auto-open that problem (e.g. from performance page "Revisit")
   const autoQid = parseInt(new URLSearchParams(location.search).get('qid'));
@@ -332,6 +336,7 @@ async function loadProblems() {
 }
 
 async function loadStats() {
+  await configReady;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       const res = await fetch(`${API}/api/dsa/stats/${username}`);

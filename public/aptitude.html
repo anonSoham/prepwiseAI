@@ -307,9 +307,9 @@
 </div><!-- end .page -->
 
 <script>
-const API = '';
-let PROCTOR_API = ''; // Set from /config — calls Render directly to bypass Vercel timeout
-fetch('/config').then(r => r.json()).then(c => { PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
+let API = '';
+let PROCTOR_API = '';
+const configReady = fetch('/config').then(r => r.json()).then(c => { API = PROCTOR_API = c.pythonApiUrl || ''; }).catch(() => {});
 
 const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
 const username = new URLSearchParams(location.search).get('username') || sd.username || '';
@@ -337,6 +337,7 @@ lucide.createIcons();
 initCameraOnLoad(); // start camera + face detection on page load
 
 async function startQuiz() {
+  await configReady;
   state.category = document.querySelector('input[name="category"]:checked').value;
   state.count    = parseInt(document.querySelector('input[name="mode"]:checked').value);
 

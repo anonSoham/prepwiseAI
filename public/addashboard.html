@@ -487,7 +487,9 @@
             const container = document.getElementById('reports-container');
             container.innerHTML = '<div class="empty-state">Loading…</div>';
             try {
-                const reports = await fetch('/api/admin/cheating-reports').then(r => r.json());
+                const cfg = await fetch('/config').then(r => r.json()).catch(() => ({ pythonApiUrl: '' }));
+                const pythonApi = cfg.pythonApiUrl || '';
+                const reports = await fetch(`${pythonApi}/api/admin/cheating-reports`).then(r => r.json());
                 if (!reports.length) {
                     container.innerHTML = '<div class="empty-state">✅ No cheating incidents reported yet.</div>';
                     return;

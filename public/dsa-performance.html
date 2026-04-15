@@ -219,7 +219,9 @@
 </div>
 
 <script>
-const API = '';
+let API = '';
+const configReady = fetch('/config').then(r => r.json()).then(c => { API = c.pythonApiUrl || ''; }).catch(() => {});
+
 const params = new URLSearchParams(location.search);
 let username = params.get('username') || '';
 
@@ -240,6 +242,7 @@ if (!username) {
 }
 
 async function loadPerformance() {
+  await configReady;
   const mainContent = document.getElementById('main-content');
   let data = null;
 
