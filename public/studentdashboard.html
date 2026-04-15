@@ -436,7 +436,7 @@
         document.getElementById('quizButton').addEventListener('click', function () {
           const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
           const u = sd.username ? '?username=' + encodeURIComponent(sd.username) : '';
-          window.location.href = 'http://localhost:8501/' + u;
+          window.location.href = 'aptitude.html' + u;
         });
       });
 
@@ -452,7 +452,7 @@
         document.getElementById('interButton').addEventListener('click', function () {
           const sd = JSON.parse(localStorage.getItem('studentData') || '{}');
           const u = sd.username ? '?username=' + encodeURIComponent(sd.username) : '';
-          window.location.href = 'http://localhost:8503/' + u;
+          window.location.href = 'mock-interview.html' + u;
         });
       });
 
