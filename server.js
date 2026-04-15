@@ -62,6 +62,7 @@ const studentSchema = new mongoose.Schema({
     picture: String,
     resumeData: { type: mongoose.Schema.Types.Mixed, default: null },
     resumePdf: { type: String, default: null },
+    resumePdfData: { type: String, default: null }, // Base64 PDF stored in MongoDB
 });
 
 // Create the Student model
@@ -530,18 +531,9 @@ app.get('/students/:username/resume', async (req, res) => {
     }
 });
 
-// PDF resume upload — use /tmp on serverless (Vercel), local uploads/ otherwise
-const uploadsDir = process.env.VERCEL
-    ? path.join('/tmp', 'resumes')
-    : path.join(__dirname, 'uploads', 'resumes');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const resumeStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => cb(null, req.params.username + '_resume.pdf'),
-});
+// PDF resume upload — store as Base64 in MongoDB (works on Vercel, no filesystem needed)
 const resumeUpload = multer({
-    storage: resumeStorage,
+    storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') cb(null, true);
         else cb(new Error('Only PDF files are allowed'));
@@ -551,26 +543,35 @@ const resumeUpload = multer({
 
 app.post('/students/:username/resume/upload', (req, res) => {
     resumeUpload.single('resume')(req, res, async (err) => {
-        if (err) {
-            return res.status(400).json({ message: err.message || 'Upload failed' });
-        }
+        if (err) return res.status(400).json({ message: err.message || 'Upload failed' });
         try {
             const username = req.params.username;
             if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-            const pdfPath = '/uploads/resumes/' + req.file.filename;
-            await Student.findOneAndUpdate({ username }, { resumePdf: pdfPath });
-            res.json({ message: 'Resume uploaded successfully', path: pdfPath });
+            const base64 = req.file.buffer.toString('base64');
+            await Student.findOneAndUpdate(
+                { username },
+                { resumePdfData: base64, resumePdf: `/students/${username}/resume/pdf` }
+            );
+            res.json({ message: 'Resume uploaded successfully', path: `/students/${username}/resume/pdf` });
         } catch (dbErr) {
             res.status(500).json({ message: dbErr.message || 'Upload failed' });
         }
     });
 });
 
-// Serve uploaded resumes — use /tmp on Vercel, local uploads/ otherwise
-const uploadsServeDir = process.env.VERCEL
-    ? '/tmp'
-    : path.join(__dirname, 'uploads');
-app.use('/uploads', express.static(uploadsServeDir));
+// Serve PDF resume from MongoDB
+app.get('/students/:username/resume/pdf', async (req, res) => {
+    try {
+        const student = await Student.findOne({ username: req.params.username }, 'resumePdfData');
+        if (!student || !student.resumePdfData) return res.status(404).send('No PDF resume found');
+        const buffer = Buffer.from(student.resumePdfData, 'base64');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${req.params.username}_resume.pdf"`);
+        res.send(buffer);
+    } catch (err) {
+        res.status(500).send('Error retrieving resume');
+    }
+});
 
 // Company Registration Route
 app.post('/company/register', async (req, res) => {
