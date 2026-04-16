@@ -60,7 +60,7 @@
     #file-name { font-size:13px; font-weight:600; color:var(--success); margin-top:10px; display:none; }
 
     /* Action buttons */
-    .action-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:20px; }
+    .action-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:20px; }
     .action-btn {
       border:1.5px solid var(--border); border-radius:12px; padding:16px 12px; text-align:center;
       cursor:pointer; background:var(--surface); transition:.2s; font-family:'Inter',sans-serif;
@@ -75,15 +75,6 @@
     /* Results */
     #results-card { display:none; }
     .result-text { font-size:14px; line-height:1.8; color:#374151; white-space:pre-wrap; }
-    .keyword-section { margin-bottom:20px; }
-    .keyword-section h3 { font-size:14px; font-weight:600; margin-bottom:10px; }
-    .keyword-tags { display:flex; flex-wrap:wrap; gap:8px; }
-    .ktag {
-      padding:5px 12px; border-radius:20px; font-size:13px; font-weight:500;
-    }
-    .ktag-tech   { background:rgba(99,102,241,.1);  color:var(--primary); }
-    .ktag-anal   { background:rgba(245,158,11,.1);  color:#d97706; }
-    .ktag-soft   { background:rgba(16,185,129,.1);  color:#059669; }
     .error-box { background:rgba(239,68,68,.05); border:1px solid rgba(239,68,68,.2); border-radius:10px; padding:14px; color:var(--error); font-size:13px; }
 
     /* Loading */
@@ -126,11 +117,6 @@
         <div class="ab-icon">🔍</div>
         <div class="ab-title">Review Resume</div>
         <div class="ab-desc">HR perspective evaluation</div>
-      </button>
-      <button class="action-btn" data-mode="keywords" onclick="analyze('keywords', this)">
-        <div class="ab-icon">🏷</div>
-        <div class="ab-title">Extract Keywords</div>
-        <div class="ab-desc">Skills & keyword gap analysis</div>
       </button>
       <button class="action-btn" data-mode="match" onclick="analyze('match', this)">
         <div class="ab-icon">📊</div>
@@ -227,29 +213,12 @@ function renderResults(data, mode) {
   const title = document.getElementById('results-title');
   card.style.display = 'block';
 
-  const titles = { review: '🔍 Resume Review', keywords: '🏷 Extracted Keywords', match: '📊 ATS Match Score' };
+  const titles = { review: '🔍 Resume Review', match: '📊 ATS Match Score' };
   title.textContent = titles[mode] || 'Analysis Results';
 
   if (data.error) { renderError(data.error); return; }
 
-  if (data.type === 'keywords') {
-    const d = data.data || {};
-    body.innerHTML = `
-      <div class="keyword-section">
-        <h3>Technical Skills</h3>
-        <div class="keyword-tags">${(d['Technical Skills'] || []).map(k => `<span class="ktag ktag-tech">${k}</span>`).join('') || '<span style="color:var(--muted);font-size:13px">None identified</span>'}</div>
-      </div>
-      <div class="keyword-section">
-        <h3>Analytical Skills</h3>
-        <div class="keyword-tags">${(d['Analytical Skills'] || []).map(k => `<span class="ktag ktag-anal">${k}</span>`).join('') || '<span style="color:var(--muted);font-size:13px">None identified</span>'}</div>
-      </div>
-      <div class="keyword-section">
-        <h3>Soft Skills</h3>
-        <div class="keyword-tags">${(d['Soft Skills'] || []).map(k => `<span class="ktag ktag-soft">${k}</span>`).join('') || '<span style="color:var(--muted);font-size:13px">None identified</span>'}</div>
-      </div>`;
-  } else {
-    body.innerHTML = `<div class="result-text">${escapeHtml(data.data || '')}</div>`;
-  }
+  body.innerHTML = `<div class="result-text">${escapeHtml(data.data || '')}</div>`;
 }
 
 function renderError(msg) {
