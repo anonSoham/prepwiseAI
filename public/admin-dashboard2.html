@@ -122,6 +122,28 @@
         .empty-state .icon i { width: 30px; height: 30px; }
         .empty-state h3 { font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 8px; }
         .empty-state p { color: #64748b; font-size: 14px; }
+
+        .section-title {
+            font-size: 18px; font-weight: 700; color: #0f172a;
+            margin: 36px 0 16px; display: flex; align-items: center; gap: 10px;
+        }
+        .count-badge {
+            font-size: 12px; font-weight: 600; padding: 2px 10px;
+            border-radius: 20px; background: rgba(99,102,241,.1); color: #6366f1;
+        }
+        .contact-card {
+            background: #fff; border-radius: 14px; padding: 20px 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+            border-left: 4px solid #6366f1; transition: all .15s;
+        }
+        .contact-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+        .contact-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .contact-card-name { font-size: 15px; font-weight: 600; color: #0f172a; }
+        .contact-card-email { font-size: 12px; color: #6366f1; margin-top: 2px; }
+        .contact-card-subject { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+        .contact-card-msg { font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 12px; }
+        .contact-card-footer { display: flex; justify-content: space-between; align-items: center; }
+        .contact-card-date { font-size: 11px; color: #94a3b8; }
     #toast-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
     .toast{display:flex;align-items:center;gap:10px;padding:13px 18px;border-radius:10px;font-size:14px;font-weight:500;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.18);min-width:260px;max-width:380px;animation:tIn .3s ease;pointer-events:all}
     .toast.success{background:#10b981}.toast.error{background:#ef4444}.toast.info{background:#6366f1}
@@ -157,6 +179,17 @@
             <div class="empty-state">
                 <div class="icon"><i data-lucide="loader"></i></div>
                 <h3>Loading announcements...</h3>
+                <p>Please wait.</p>
+            </div>
+        </div>
+
+        <div class="section-title">
+            📩 Contact Messages <span class="count-badge" id="contact-count">0</span>
+        </div>
+        <div class="announcements" id="contacts-section">
+            <div class="empty-state">
+                <div class="icon"><i data-lucide="loader"></i></div>
+                <h3>Loading messages...</h3>
                 <p>Please wait.</p>
             </div>
         </div>
@@ -206,6 +239,60 @@
             }
         }
 
+        async function fetchContacts() {
+            try {
+                const response = await fetch('/contacts');
+                const data = await response.json();
+                const section = document.getElementById('contacts-section');
+                document.getElementById('contact-count').textContent = data.length;
+
+                if (data.length === 0) {
+                    section.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i data-lucide="mail-open"></i></div>
+                            <h3>No Messages Yet</h3>
+                            <p>Contact form submissions will appear here.</p>
+                        </div>`;
+                    lucide.createIcons();
+                } else {
+                    section.innerHTML = data.map(m => `
+                        <div class="contact-card">
+                            <div class="contact-card-header">
+                                <div>
+                                    <div class="contact-card-name">${escapeHtml(m.firstName)} ${escapeHtml(m.lastName)}</div>
+                                    <div class="contact-card-email">${escapeHtml(m.email)}</div>
+                                </div>
+                            </div>
+                            <div class="contact-card-subject">📌 ${escapeHtml(m.subject)}</div>
+                            <div class="contact-card-msg">${escapeHtml(m.message)}</div>
+                            <div class="contact-card-footer">
+                                <span class="contact-card-date">${new Date(m.createdAt).toLocaleString()}</span>
+                                <button class="delete-btn" onclick="deleteContact('${m._id}')">Delete</button>
+                            </div>
+                        </div>`).join('');
+                }
+            } catch (error) {
+                console.error('Error fetching contacts:', error);
+            }
+        }
+
+        async function deleteContact(id) {
+            if (!confirm('Delete this message?')) return;
+            try {
+                const response = await fetch(`/contacts/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    showToast('Message deleted', 'success');
+                    fetchContacts();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
         window.onload = () => {
             document.getElementById('logoutBtn').addEventListener('click', (e) => {
                 e.preventDefault();
@@ -213,6 +300,7 @@
                 window.location.href = 'admin-login.html';
             });
             fetchAnnouncements();
+            fetchContacts();
         };
     </script>
     <script>

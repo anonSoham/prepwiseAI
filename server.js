@@ -108,6 +108,17 @@ const companySchema = new mongoose.Schema({
 // Create the Company model
 const Company = mongoose.model('Company', companySchema);
 
+// Define the Contact Message schema
+const contactSchema = new mongoose.Schema({
+    firstName: String,
+    lastName:  String,
+    email:     String,
+    subject:   String,
+    message:   String,
+    createdAt: { type: Date, default: Date.now },
+});
+const Contact = mongoose.model('Contact', contactSchema);
+
 // Create an announcement (Admin only)
 app.post('/announcements', async (req, res) => {
     try {
@@ -636,6 +647,38 @@ app.post('/company/login', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: 'Error during login', error });
+    }
+});
+
+// Contact form — save submission
+app.post('/contacts', async (req, res) => {
+    try {
+        const { firstName, lastName, email, subject, message } = req.body;
+        await new Contact({ firstName, lastName, email, subject, message }).save();
+        res.status(201).json({ message: 'Message received' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error saving message', error: err });
+    }
+});
+
+// Contact form — admin fetch all (newest first)
+app.get('/contacts', async (req, res) => {
+    try {
+        const messages = await Contact.find().sort({ createdAt: -1 });
+        res.status(200).json(messages);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching messages', error: err });
+    }
+});
+
+// Contact form — admin delete by MongoDB _id
+app.delete('/contacts/:id', async (req, res) => {
+    try {
+        const deleted = await Contact.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ message: 'Message not found' });
+        res.status(200).json({ message: 'Message deleted' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error deleting message', error: err });
     }
 });
 

@@ -453,20 +453,38 @@
     document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
 
     // Contact form
-    document.getElementById('contact-form').addEventListener('submit', function(e) {
+    document.getElementById('contact-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         var msg = document.getElementById('form-msg');
         var btn = this.querySelector('.submit-btn');
         btn.textContent = 'Sending…';
         btn.disabled = true;
-        setTimeout(function() {
-            msg.style.color = '#888';
+
+        var fields = this.querySelectorAll('input, textarea');
+        try {
+            var res = await fetch('/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    firstName: fields[0].value.trim(),
+                    lastName:  fields[1].value.trim(),
+                    email:     fields[2].value.trim(),
+                    subject:   fields[3].value.trim(),
+                    message:   fields[4].value.trim(),
+                }),
+            });
+            if (!res.ok) throw new Error();
+            msg.style.color = '#10b981';
             msg.textContent = '✓ Message sent! We\'ll get back to you within 24 hours.';
-            btn.innerHTML = 'Send Message <i data-lucide="send"></i>';
-            btn.disabled = false;
-            lucide.createIcons();
             document.getElementById('contact-form').reset();
-        }, 1000);
+        } catch {
+            msg.style.color = '#ef4444';
+            msg.textContent = '✗ Failed to send. Please try again.';
+        }
+
+        btn.innerHTML = 'Send Message <i data-lucide="send"></i>';
+        btn.disabled = false;
+        lucide.createIcons();
     });
     </script>
 </body>
